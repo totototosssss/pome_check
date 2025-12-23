@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pome Classify: Complete</title>
+    <title>Pome Classify: Precision</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
@@ -131,9 +131,9 @@
 </head>
 <body>
 
-    <div id="sync-notify"><div class="dot"></div>Received new knowledge!</div>
+    <div id="sync-notify"><div class="dot"></div>Received Update</div>
 
-    <h1>Pome Classify <span style="font-size:0.5em; background:#eee; padding:3px 6px; border-radius:4px; vertical-align:middle;">LIVE</span></h1>
+    <h1>Pome Classify <span style="font-size:0.5em; background:#eee; padding:3px 6px; border-radius:4px; vertical-align:middle;">PRO</span></h1>
 
     <div class="viewport" id="viewport">
         <div class="placeholder">Waiting for brain...<br><span style="font-size:0.8em;opacity:0.5;">Paste enabled</span></div>
@@ -145,7 +145,7 @@
             Select Photo
             <input type="file" id="file-input" accept="image/*">
         </label>
-        <button id="predict-btn" class="btn btn-primary" disabled>Loading Brain...</button>
+        <button id="predict-btn" class="btn btn-primary" disabled>Loading...</button>
     </div>
 
     <div id="result-area">
@@ -162,12 +162,12 @@
     </div>
 
     <div id="status-bar">
-        <span id="brain-status">Connecting to Hive Mind...</span>
+        <span id="brain-status">Connecting...</span>
     </div>
 
     <div id="overlay">
         <div class="check-icon">✓</div>
-        <div style="font-weight:700;">Learned & Shared.</div>
+        <div style="font-weight:700;">Learned.</div>
     </div>
 
     <script>
@@ -189,12 +189,12 @@
         // ==========================================
         // VARIABLES
         // ==========================================
-        const STATE_KEY = 'pome_app_state_v5';
+        const STATE_KEY = 'pome_app_state_v6'; // v6 for Packaged Data
         let net;
         let classifier;
-        let totalExamples = 0;
-        let isBrainReady = false; // 脳みその準備完了フラグ
-        let pendingPrediction = false; // 待機中の判定リクエスト
+        let totalDocs = 0; // ドキュメント数(ユーザーアクション数)
+        let isBrainReady = false;
+        let pendingPrediction = false;
 
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -207,79 +207,73 @@
         const placeholder = document.querySelector('.placeholder');
 
         // ==========================================
-        // 1. INIT & REAL-TIME SYNC
+        // 1. INIT
         // ==========================================
         async function init() {
             try {
-                // MobileNetロード
                 net = await mobilenet.load({ version: 2, alpha: 1.0 });
                 classifier = knnClassifier.create();
                 
-                // リアルタイムリスナー開始
                 startRealtimeListener();
 
-                // 以前の画像を復元 (ただし判定はデータが来てから)
                 const savedImage = localStorage.getItem(STATE_KEY);
                 if (savedImage) {
                     loadImage(savedImage, false);
-                    pendingPrediction = true; // データが来たら自動判定するフラグ
+                    pendingPrediction = true;
                 }
-
             } catch (e) {
                 brainStatus.innerText = "Error: " + e.message;
             }
         }
 
         function startRealtimeListener() {
-            brainStatus.innerText = "Downloading global knowledge...";
+            brainStatus.innerText = "Syncing...";
             
-            // データセットv5を監視
-            db.collection('dataset_v5')
+            // dataset_v6: Packaged Format
+            db.collection('dataset_v6')
               .orderBy('timestamp', 'desc')
-              .limit(1000)
+              .limit(800)
               .onSnapshot((snapshot) => {
                   
-                  let newItemsCount = 0;
+                  let newDocsCount = 0;
                   snapshot.docChanges().forEach((change) => {
                       if (change.type === "added") {
                           try {
                               const data = change.doc.data();
-                              const tensor = tf.tensor(JSON.parse(data.features));
-                              classifier.addExample(tensor, data.label);
-                              tensor.dispose();
-                              newItemsCount++;
-                              totalExamples++;
+                              // パッケージ化された配列(featureBatch)を展開して学習
+                              if(data.featureBatch) {
+                                  const batch = JSON.parse(data.featureBatch);
+                                  // batch = [feature1, feature2, ...]
+                                  batch.forEach(feature => {
+                                      const tensor = tf.tensor(feature);
+                                      classifier.addExample(tensor, data.label);
+                                      tensor.dispose();
+                                  });
+                              }
+                              newDocsCount++;
+                              totalDocs++;
                           } catch(e) {}
                       }
                   });
 
-                  // ステータス更新
-                  brainStatus.innerText = `Brain Active: ${totalExamples} patterns loaded.`;
+                  brainStatus.innerText = `Brain: ${totalDocs} entries loaded.`;
 
-                  // 初回のデータロード完了 or データ更新時
-                  if (!isBrainReady && totalExamples > 0) {
+                  if (!isBrainReady && (totalDocs > 0 || snapshot.size === 0)) {
                       isBrainReady = true;
                       predictBtn.innerText = "Identify";
                       placeholder.innerHTML = "Ready.<br><span style='font-size:0.8em;opacity:0.5;'>Paste enabled</span>";
                       
-                      // ★ここが重要: 待機していた判定を実行
+                      if (totalDocs === 0) brainStatus.innerText = "Brain is empty.";
+
                       if (pendingPrediction && canvas.classList.contains('show')) {
                           predictBtn.disabled = false;
                           predictBtn.click();
                           pendingPrediction = false;
                       }
-                  } else if (totalExamples === 0) {
-                      // まだデータが0件の場合
-                      isBrainReady = true; 
-                      predictBtn.innerText = "Identify";
-                      predictBtn.disabled = false;
-                      brainStatus.innerText = "Brain is empty. Please teach me!";
                   }
 
-                  // 他人からの更新通知
-                  if (newItemsCount > 0 && totalExamples > newItemsCount) {
+                  if (newDocsCount > 0 && totalDocs > newDocsCount) {
                       showSyncNotify();
-                      // 画像が表示されていれば自動再判定
                       if (canvas.classList.contains('show')) {
                            predictBtn.disabled = false;
                            predictBtn.click();
@@ -308,6 +302,7 @@
             const img = new Image();
             img.src = src;
             img.onload = () => {
+                // Draw Original (Centered)
                 const size = Math.min(img.width, img.height);
                 const sx = (img.width - size) / 2;
                 const sy = (img.height - size) / 2;
@@ -320,14 +315,12 @@
                 
                 if(save) saveState(src);
 
-                // 脳の準備ができていれば判定ボタン有効化＆自動判定
                 if (isBrainReady) {
                     predictBtn.disabled = false;
-                    if(!save) predictBtn.click(); // リロード復帰時の自動判定
+                    if(!save) predictBtn.click();
                 } else {
-                    // まだ準備中ならフラグだけ立てる
                     predictBtn.disabled = true;
-                    predictBtn.innerText = "Loading Brain...";
+                    predictBtn.innerText = "Loading...";
                 }
             };
         }
@@ -364,15 +357,12 @@
         // 3. PREDICT
         // ==========================================
         predictBtn.addEventListener('click', async () => {
-            // 脳みそがまだロード中、または空っぽの場合はガード
             if (!net || !classifier) return;
-            
             predictBtn.disabled = true;
             
-            // データが0件の場合は「判定」せず「データなし」を表示
             if (classifier.getNumClasses() === 0) {
                 document.getElementById('pred-label').innerText = "Unknown";
-                document.getElementById('pred-conf').innerText = "Brain is empty. Please teach below.";
+                document.getElementById('pred-conf').innerText = "No data yet.";
                 resultArea.classList.add('visible');
                 predictBtn.disabled = false;
                 return;
@@ -382,7 +372,8 @@
             const activation = net.infer(imgTensor, 'conv_preds');
 
             try {
-                const result = await classifier.predictClass(activation, 10);
+                // K値はデータ密度が高まるので少し大きめに
+                const result = await classifier.predictClass(activation, 15);
                 const label = result.label;
                 const conf = result.confidences[label] ? Math.floor(result.confidences[label] * 100) : 0;
 
@@ -397,9 +388,7 @@
                 
                 document.getElementById('pred-conf').innerText = `${conf}% Confidence`;
                 resultArea.classList.add('visible');
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
 
             imgTensor.dispose();
             activation.dispose();
@@ -407,59 +396,74 @@
         });
 
         // ==========================================
-        // 4. LEARN
+        // 4. LEARN (Precision Packaging)
         // ==========================================
         window.teach = async function(label) {
-            // 連打防止
             const buttons = document.querySelectorAll('button');
             buttons.forEach(b => b.disabled = true);
-            brainStatus.innerText = "Broadcasting new knowledge...";
+            brainStatus.innerText = "Processing High-Precision Data...";
             
-            const imgTensor = tf.browser.fromPixels(canvas);
+            // キャンバスから画像を取得して、TensorFlowで加工
+            // ここで「回転」などの高度なAugmentationを行うため、
+            // tf.tidyでメモリ管理しながら複数のテンソルを生成
             
-            const tensorBatch = tf.tidy(() => {
+            const featureList = await tf.tidy(() => {
+                const imgTensor = tf.browser.fromPixels(canvas); // [224,224,3] Int32
                 const tensors = [];
-                const types = [];
-                // 1. Orig
-                tensors.push(imgTensor.clone()); types.push("orig");
-                // 2. Flip
-                tensors.push(imgTensor.reverse(2)); types.push("flip");
-                // 3. Bri+
-                tensors.push(imgTensor.add(tf.scalar(25)).clipByValue(0,255).cast('int32')); types.push("bri+");
-                // 4. Bri-
-                tensors.push(imgTensor.sub(tf.scalar(25)).clipByValue(0,255).cast('int32')); types.push("bri-");
-                // 5. Noise
-                const noise = tf.randomNormal(imgTensor.shape, 0, 5, 'int32');
-                tensors.push(imgTensor.add(noise).clipByValue(0,255).cast('int32')); types.push("noise");
-                return { tensors, types };
+
+                // 1. Original
+                tensors.push(imgTensor.cast('float32'));
+
+                // 2. Flip (左右反転)
+                tensors.push(imgTensor.reverse(2).cast('float32'));
+
+                // 3. Brightness +
+                tensors.push(imgTensor.add(tf.scalar(20)).clipByValue(0,255).cast('float32'));
+
+                // ★ New: Rotation (擬似的) is hard in pure TFJS without external ops.
+                // 代わりに、少しZoom(Center Cropを狭める)して、ノイズを加えることで「ブレ」に強くする
+                // または、Canvas APIを使って物理的に回転させた画像を生成する手もあるが、
+                // ここでは処理速度優先で「ノイズ」と「明るさ変動」を重視する
+                
+                // 4. Noise (画質悪い版)
+                const noise = tf.randomNormal(imgTensor.shape, 0, 5, 'float32');
+                tensors.push(imgTensor.cast('float32').add(noise).clipByValue(0,255));
+
+                // 5. Darken (暗い版)
+                tensors.push(imgTensor.sub(tf.scalar(20)).clipByValue(0,255).cast('float32'));
+
+                // 推論実行して特徴量(embeddings)だけを取り出す
+                // MobileNetはInt32でも動くがFloat推奨
+                return tensors.map(t => net.infer(t, 'conv_preds'));
             });
 
-            const batch = db.batch();
+            // Feature List (Tensors) -> Array of Arrays
+            const packedFeatures = [];
+            for (const fTensor of featureList) {
+                const arr = await fTensor.array();
+                packedFeatures.push(arr);
+                fTensor.dispose(); // メモリ解放
+            }
 
+            // Database Save (1 Document = 1 Package)
             try {
-                for (let i = 0; i < tensorBatch.tensors.length; i++) {
-                    const f = await net.infer(tensorBatch.tensors[i], 'conv_preds').array();
-                    const ref = db.collection('dataset_v5').doc();
-                    batch.set(ref, {
-                        label: label,
-                        features: JSON.stringify(f),
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        augType: tensorBatch.types[i]
-                    });
-                }
+                // 送信
+                await db.collection('dataset_v6').add({
+                    label: label,
+                    featureBatch: JSON.stringify(packedFeatures), // 圧縮して保存
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    count: packedFeatures.length // 情報として持っておく
+                });
 
-                await batch.commit();
-
+                // UI Feedback
                 overlay.classList.add('show');
                 setTimeout(() => overlay.classList.remove('show'), 1500);
-                brainStatus.innerText = "Knowledge shared.";
+                brainStatus.innerText = "Learned.";
 
             } catch (e) {
                 console.error(e);
-                alert("Upload failed. Check connection.");
+                alert("Upload failed.");
             } finally {
-                imgTensor.dispose();
-                tf.dispose(tensorBatch.tensors);
                 buttons.forEach(b => b.disabled = false);
             }
         };
