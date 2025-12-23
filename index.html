@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pome Classify</title>
+    <title>Pome Classify: God Mode</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
@@ -19,11 +19,11 @@
             --sub-text: #86868b;
             --accent: #000000;
             --btn-bg: #f5f5f7;
-            --radius: 18px;
+            --radius: 20px;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
@@ -35,128 +35,77 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            letter-spacing: -0.02em;
-            margin: 0 0 40px 0;
-            color: var(--text);
-        }
+        h1 { font-size: 1.4rem; font-weight: 600; margin: 0 0 30px 0; opacity: 0.9; }
 
-        /* 画像エリア */
+        /* メインビューポート */
         .viewport {
-            width: 280px;
-            height: 280px;
+            width: 300px; height: 300px;
             background-color: var(--btn-bg);
             border-radius: var(--radius);
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            border: 2px solid transparent;
         }
-        .viewport.active { transform: scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.12); }
+        .viewport.active { transform: scale(1.02); box-shadow: 0 20px 50px rgba(0,0,0,0.15); }
+        .viewport.paste-active { border-color: #007AFF; background: #eef7ff; }
 
-        canvas {
-            width: 100%; height: 100%;
-            display: block;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
+        canvas { width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 0.4s; }
         canvas.show { opacity: 1; }
 
         .placeholder {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            color: var(--sub-text);
-            font-size: 0.9rem;
-            pointer-events: none;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: var(--sub-text); font-size: 0.9rem; text-align: center; line-height: 1.5; pointer-events: none;
         }
 
-        /* コントロール */
-        .actions {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            width: 100%;
-            max-width: 320px;
-            margin-bottom: 30px;
-        }
-
-        button, .file-btn {
-            appearance: none;
-            border: none;
-            background: var(--btn-bg);
-            color: var(--text);
-            padding: 16px;
-            border-radius: 14px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.2s ease;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .file-btn:active, button:active { transform: scale(0.96); background: #e5e5e5; }
-        .primary-btn { background: var(--accent); color: white; }
-        .primary-btn:hover { opacity: 0.9; }
-        .primary-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
+        /* アクションエリア */
+        .actions { width: 100%; max-width: 320px; display: flex; gap: 10px; margin-bottom: 30px; }
         
+        .btn {
+            flex: 1; padding: 16px; border-radius: 14px; border: none;
+            background: var(--btn-bg); color: var(--text);
+            font-size: 0.95rem; font-weight: 600; cursor: pointer;
+            transition: 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:disabled { opacity: 0.3; cursor: default; transform: none; }
         input[type="file"] { display: none; }
 
         /* 結果表示 */
         #result-area {
-            text-align: center;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.4s ease;
-            pointer-events: none; /* 非表示時はクリック不可 */
+            text-align: center; opacity: 0; transform: translateY(10px);
+            transition: all 0.4s; pointer-events: none; width: 100%; max-width: 400px;
         }
         #result-area.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-        .prediction { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 5px; }
-        .confidence { color: var(--sub-text); font-size: 0.85rem; margin-bottom: 25px; }
+        .pred-val { font-size: 2.8rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 5px; }
+        .pred-conf { color: var(--sub-text); font-size: 0.9rem; margin-bottom: 20px; font-family: monospace; }
 
-        /* 学習ボタン群 */
-        .teach-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            width: 100%;
-            max-width: 380px;
-        }
+        /* 学習ボタン (グリッド) */
+        .teach-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .teach-btn {
-            font-size: 0.8rem;
-            padding: 12px 0;
-            background: white;
-            border: 1px solid #e5e5e5;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            padding: 14px 0; background: white; border: 1px solid #e5e5e5;
+            border-radius: 12px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+            transition: 0.2s;
         }
-        .teach-btn:hover { border-color: var(--accent); }
+        .teach-btn:hover { border-color: var(--accent); background: var(--btn-bg); }
+        .teach-btn:active { transform: scale(0.95); }
 
-        /* ステータス & オーバーレイ */
-        .status-bar {
-            position: fixed; bottom: 20px;
-            font-size: 0.75rem; color: #c7c7cc;
-            font-family: monospace;
-        }
-
-        /* 全画面オーバーレイ（完了通知） */
+        /* 通知関連 */
+        #status { position: fixed; bottom: 20px; font-size: 0.7rem; color: #ccc; font-family: monospace; }
+        
         #overlay {
-            position: fixed; inset: 0;
-            background: rgba(255,255,255,0.9);
-            backdrop-filter: blur(5px);
-            display: flex; align-items: center; justify-content: center;
-            flex-direction: column;
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.3s;
-            z-index: 999;
+            position: fixed; inset: 0; background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(10px); z-index: 1000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: 0.3s;
         }
-        #overlay.show { opacity: 1; pointer-events: auto; }
-        .overlay-icon { font-size: 3rem; margin-bottom: 10px; transform: scale(0.5); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        #overlay.show .overlay-icon { transform: scale(1); }
-        .overlay-text { font-weight: 600; font-size: 1.2rem; }
+        #overlay.show { opacity: 1; }
+        .check-icon { font-size: 4rem; margin-bottom: 10px; color: var(--accent); transform: scale(0.5); transition: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        #overlay.show .check-icon { transform: scale(1); }
 
     </style>
 </head>
@@ -165,21 +114,21 @@
     <h1>Pome Classify</h1>
 
     <div class="viewport" id="viewport">
-        <div class="placeholder">Select Image</div>
+        <div class="placeholder">Select Image<br><span style="font-size:0.8em; opacity:0.6;">or Paste (Ctrl+V)</span></div>
         <canvas id="canvas"></canvas>
     </div>
 
     <div class="actions">
-        <label class="file-btn">
-            Photo
+        <label class="btn">
+            Select Photo
             <input type="file" id="file-input" accept="image/*">
         </label>
-        <button id="predict-btn" class="primary-btn" disabled>Identify</button>
+        <button id="predict-btn" class="btn btn-primary" disabled>Identify</button>
     </div>
 
     <div id="result-area">
-        <div class="prediction" id="pred-label"></div>
-        <div class="confidence" id="pred-conf"></div>
+        <div class="pred-val" id="pred-label"></div>
+        <div class="pred-conf" id="pred-conf"></div>
 
         <div class="teach-grid">
             <button class="teach-btn" onclick="teach('もち')">もち</button>
@@ -187,19 +136,20 @@
             <button class="teach-btn" onclick="teach('きなこ')">きなこ</button>
             <button class="teach-btn" onclick="teach('くろみつ')">くろみつ</button>
         </div>
-        <div style="font-size:0.7rem; color:#ccc; margin-top:10px;">Tap correct name to train</div>
+        <p style="font-size:0.7rem; color:#ccc; margin-top:15px;">Tap correct name to train (5x Augmentation)</p>
     </div>
 
-    <div class="status-bar" id="status">Initializing Neural Engine...</div>
+    <div id="status">System Initializing...</div>
 
     <div id="overlay">
-        <div class="overlay-icon">✓</div>
-        <div class="overlay-text">Learning Complete</div>
+        <div class="check-icon">✓</div>
+        <div style="font-weight:700; font-size:1.2rem;">Learned perfectly.</div>
+        <div style="font-size:0.8rem; color:#888; margin-top:5px;">5 variations stored</div>
     </div>
 
     <script>
         // ==========================================
-        // 1. Configuration & Setup
+        // CONFIG
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyDKcFzyED8hWVUdJR0FDmWFOl0UWzOWN3U",
@@ -214,39 +164,36 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Variables
         let net;
         let classifier;
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const statusEl = document.getElementById('status');
-        const resultArea = document.getElementById('result-area');
-        const predictBtn = document.getElementById('predict-btn');
         const overlay = document.getElementById('overlay');
         const viewport = document.getElementById('viewport');
+        const predictBtn = document.getElementById('predict-btn');
 
         // ==========================================
-        // 2. Core Logic (The "Supreme" ML)
+        // 1. SYSTEM INIT
         // ==========================================
-        
         async function init() {
             try {
-                // MobileNet V2 (Alpha 1.0) for maximum accuracy
+                // MobileNet V2 (Alpha 1.0) - The most powerful lightweight model
                 net = await mobilenet.load({ version: 2, alpha: 1.0 });
                 classifier = knnClassifier.create();
                 
-                statusEl.innerText = "Syncing with Cloud Brain...";
+                statusEl.innerText = "Syncing Shared Brain...";
                 await loadData();
                 
-                statusEl.innerText = "Ready";
+                statusEl.innerText = "Ready to Paste or Upload";
             } catch (e) {
                 statusEl.innerText = "Error: " + e.message;
             }
         }
 
         async function loadData() {
-            // Load latest 800 examples
-            const snapshot = await db.collection('dataset_v3').orderBy('timestamp', 'desc').limit(800).get();
+            // Load latest 1000 examples from the V4 (God Mode) dataset
+            const snapshot = await db.collection('dataset_v4').orderBy('timestamp', 'desc').limit(1000).get();
             if (snapshot.empty) return;
             
             snapshot.forEach(doc => {
@@ -260,131 +207,175 @@
         }
 
         // ==========================================
-        // 3. Interaction & Prediction
+        // 2. IMAGE HANDLING (File & Paste)
         // ==========================================
+        
+        // Common Image Loader
+        function loadImage(src) {
+            const img = new Image();
+            img.src = src;
+            img.onload = () => {
+                // Center Crop Logic
+                const size = Math.min(img.width, img.height);
+                const sx = (img.width - size) / 2;
+                const sy = (img.height - size) / 2;
 
+                canvas.width = 224; canvas.height = 224;
+                ctx.drawImage(img, sx, sy, size, size, 0, 0, 224, 224);
+                
+                canvas.classList.add('show');
+                viewport.classList.add('active');
+                predictBtn.disabled = false;
+                document.getElementById('result-area').classList.remove('visible');
+                statusEl.innerText = "Image Locked";
+            };
+        }
+
+        // File Input Handler
         document.getElementById('file-input').addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
-                    // Center Crop & Draw
-                    const size = Math.min(img.width, img.height);
-                    const sx = (img.width - size) / 2;
-                    const sy = (img.height - size) / 2;
-
-                    canvas.width = 224; canvas.height = 224;
-                    ctx.drawImage(img, sx, sy, size, size, 0, 0, 224, 224);
-                    
-                    canvas.classList.add('show');
-                    predictBtn.disabled = false;
-                    resultArea.classList.remove('visible'); // Hide previous result
-                    viewport.classList.add('active');
-                    statusEl.innerText = "Image Loaded";
-                }
-            };
-            reader.readAsDataURL(file);
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => loadImage(ev.target.result);
+                reader.readAsDataURL(file);
+            }
         });
 
+        // ★ Paste Event Handler (Ctrl+V)
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            let blob = null;
+
+            for (const item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    blob = item.getAsFile();
+                    break;
+                }
+            }
+
+            if (blob) {
+                e.preventDefault(); // Prevent default paste behavior
+                viewport.classList.add('paste-active');
+                setTimeout(() => viewport.classList.remove('paste-active'), 200);
+                
+                const reader = new FileReader();
+                reader.onload = (ev) => loadImage(ev.target.result);
+                reader.readAsDataURL(blob);
+            }
+        });
+
+        // ==========================================
+        // 3. PREDICTION
+        // ==========================================
         predictBtn.addEventListener('click', async () => {
             if (!net) return;
-            statusEl.innerText = "Analyzing...";
+            statusEl.innerText = "Processing...";
             predictBtn.disabled = true;
 
             const imgTensor = tf.browser.fromPixels(canvas);
             const activation = net.infer(imgTensor, 'conv_preds');
 
             if (classifier.getNumClasses() > 0) {
-                // K=7 for stability
-                const result = await classifier.predictClass(activation, 7);
+                // K=10 for maximum stability against noise
+                const result = await classifier.predictClass(activation, 10);
                 
                 const label = result.label;
                 const conf = result.confidences[label] ? Math.floor(result.confidences[label] * 100) : 0;
 
                 document.getElementById('pred-label').innerText = label;
                 document.getElementById('pred-conf').innerText = `${conf}% Confidence`;
-                resultArea.classList.add('visible');
+                document.getElementById('result-area').classList.add('visible');
             } else {
                 document.getElementById('pred-label').innerText = "Unknown";
-                document.getElementById('pred-conf').innerText = "No training data yet";
-                resultArea.classList.add('visible');
+                document.getElementById('pred-conf').innerText = "No data available";
+                document.getElementById('result-area').classList.add('visible');
             }
 
-            // Cleanup
             imgTensor.dispose();
-            activation.dispose(); // We re-compute during teaching for augmentation
+            activation.dispose();
             predictBtn.disabled = false;
-            statusEl.innerText = "Done";
+            statusEl.innerText = "Waiting for input";
         });
 
         // ==========================================
-        // 4. Learning (Triple Augmentation)
+        // 4. LEARNING (5-Point Augmentation)
         // ==========================================
-        
         window.teach = async function(label) {
-            statusEl.innerText = "Training...";
+            statusEl.innerText = "Running 5-Point Augmentation...";
             
-            // Generate Tensors
-            // 1. Original
-            const imgTensor = tf.browser.fromPixels(canvas);
-            
-            // 2. Flipped (左右反転)
-            const flippedTensor = imgTensor.reverse(2);
-            
-            // 3. Brightness Adjusted (少し明るくする) - Robustness against lighting
-            // Values are int32 [0, 255]. Add 20 brightness. Clip to 255.
-            const brightTensor = tf.tidy(() => {
-                return imgTensor.add(tf.scalar(20)).clipByValue(0, 255).cast('int32');
+            // 1. Base Tensor
+            const imgTensor = tf.browser.fromPixels(canvas); // [224, 224, 3]
+
+            // 5 Variations using tf.tidy for strict memory management
+            const tensorBatch = tf.tidy(() => {
+                const tensors = [];
+                const types = [];
+
+                // A. Original
+                tensors.push(imgTensor.clone());
+                types.push("original");
+
+                // B. Flip (Mirror)
+                tensors.push(imgTensor.reverse(2));
+                types.push("flip");
+
+                // C. Brightness Up (+20)
+                tensors.push(imgTensor.add(tf.scalar(25)).clipByValue(0, 255).cast('int32'));
+                types.push("bright_up");
+
+                // D. Brightness Down (-20)
+                tensors.push(imgTensor.sub(tf.scalar(25)).clipByValue(0, 255).cast('int32'));
+                types.push("bright_down");
+
+                // E. Noise (Robustness against bad cameras)
+                const noise = tf.randomNormal(imgTensor.shape, 0, 5, 'int32'); // Mean 0, Std 5
+                tensors.push(imgTensor.add(noise).clipByValue(0, 255).cast('int32'));
+                types.push("noise");
+
+                return { tensors, types };
             });
 
             // Process Batch
-            const tensors = [imgTensor, flippedTensor, brightTensor];
-            const tags = ["original", "flip", "bright"];
-            const batch = db.batch();
+            const batchWrite = db.batch();
 
             try {
-                for (let i = 0; i < tensors.length; i++) {
-                    const t = tensors[i];
+                for (let i = 0; i < tensorBatch.tensors.length; i++) {
+                    const t = tensorBatch.tensors[i];
+                    const type = tensorBatch.types[i];
+
+                    // Infer features
                     const activation = net.infer(t, 'conv_preds');
-                    
+
                     // Local Learn
                     classifier.addExample(activation, label);
 
                     // Cloud Save
                     const features = await activation.array();
-                    const ref = db.collection('dataset_v3').doc();
-                    batch.set(ref, {
+                    const ref = db.collection('dataset_v4').doc(); // V4 dataset
+                    batchWrite.set(ref, {
                         label: label,
                         features: JSON.stringify(features),
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        augType: tags[i]
+                        augType: type
                     });
 
-                    activation.dispose();
+                    activation.dispose(); // Cleanup activation
                 }
 
-                await batch.commit();
+                await batchWrite.commit(); // Send to Firebase
 
                 // UI Feedback
                 overlay.classList.add('show');
-                setTimeout(() => {
-                    overlay.classList.remove('show');
-                }, 1500);
-                
-                statusEl.innerText = "Saved (x3 Augmented)";
+                setTimeout(() => overlay.classList.remove('show'), 1500);
+                statusEl.innerText = "5x Variations Learned";
 
             } catch (e) {
                 console.error(e);
-                alert("Save Failed");
+                alert("Upload failed. Check console.");
             } finally {
-                // Cleanup Tensors
+                // Cleanup source tensors
                 imgTensor.dispose();
-                flippedTensor.dispose();
-                brightTensor.dispose();
+                tf.dispose(tensorBatch.tensors); // Dispose all augmented tensors
             }
         };
 
