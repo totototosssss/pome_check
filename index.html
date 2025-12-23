@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ポメラニアン集合知AIシステム</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pome Classify</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
@@ -11,173 +11,196 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
 
     <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1d1d1f;
+            --sub-text: #86868b;
+            --accent: #000000;
+            --btn-bg: #f5f5f7;
+            --radius: 18px;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-            background-color: #f8f9fa;
-            color: #212529;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
             margin: 0;
-            padding: 20px;
+            padding: 40px 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-        }
-        h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #333; }
-        p.subtitle { color: #6c757d; font-size: 0.9rem; margin-top: 0; margin-bottom: 1.5rem; }
-
-        .main-card {
-            background: white;
-            padding: 20px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            width: 100%;
-            max-width: 480px;
-            text-align: center;
-            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* 画像プレビュー */
-        .image-area {
-            width: 100%;
-            height: 300px;
-            background-color: #e9ecef;
-            border-radius: 12px;
-            margin-bottom: 20px;
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin: 0 0 40px 0;
+            color: var(--text);
+        }
+
+        /* 画像エリア */
+        .viewport {
+            width: 280px;
+            height: 280px;
+            background-color: var(--btn-bg);
+            border-radius: var(--radius);
+            margin-bottom: 30px;
             position: relative;
             overflow: hidden;
-            border: 2px dashed #dee2e6;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
-        #uploaded-image {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: none;
+        .viewport.active { transform: scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.12); }
+
+        canvas {
+            width: 100%; height: 100%;
+            display: block;
+            opacity: 0;
+            transition: opacity 0.5s;
         }
-        #placeholder-text {
-            color: #adb5bd;
+        canvas.show { opacity: 1; }
+
+        .placeholder {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--sub-text);
             font-size: 0.9rem;
             pointer-events: none;
         }
 
-        /* 操作ボタン */
-        .controls {
+        /* コントロール */
+        .actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
+            width: 100%;
+            max-width: 320px;
+            margin-bottom: 30px;
         }
-        .btn {
-            padding: 12px 0;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.95rem;
-        }
-        .btn-select { background-color: #e9ecef; color: #495057; }
-        .btn-select:hover { background-color: #dee2e6; }
-        
-        .btn-predict { background-color: #333; color: white; }
-        .btn-predict:hover { background-color: #000; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+        button, .file-btn {
+            appearance: none;
+            border: none;
+            background: var(--btn-bg);
+            color: var(--text);
+            padding: 16px;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .file-btn:active, button:active { transform: scale(0.96); background: #e5e5e5; }
+        .primary-btn { background: var(--accent); color: white; }
+        .primary-btn:hover { opacity: 0.9; }
+        .primary-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
+        
         input[type="file"] { display: none; }
 
-        /* 結果表示エリア */
-        #result-section {
-            display: none;
-            border-top: 1px solid #eee;
-            padding-top: 20px;
-            animation: fadeIn 0.5s ease;
+        /* 結果表示 */
+        #result-area {
+            text-align: center;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.4s ease;
+            pointer-events: none; /* 非表示時はクリック不可 */
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        #result-area.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-        .result-title { font-size: 1.8rem; font-weight: 800; margin-bottom: 5px; color: #333; }
-        .result-desc { font-size: 0.9rem; color: #666; margin-bottom: 20px; }
+        .prediction { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 5px; }
+        .confidence { color: var(--sub-text); font-size: 0.85rem; margin-bottom: 25px; }
 
-        /* 学習ボタンエリア */
-        .teach-area {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 15px;
-        }
-        .teach-label { font-size: 0.8rem; font-weight: bold; color: #888; margin-bottom: 10px; display: block; }
-        
+        /* 学習ボタン群 */
         .teach-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(4, 1fr);
             gap: 8px;
+            width: 100%;
+            max-width: 380px;
         }
         .teach-btn {
-            background: white;
-            border: 1px solid #ced4da;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            color: #495057;
-            cursor: pointer;
-            transition: 0.1s;
-        }
-        .teach-btn:active { transform: scale(0.98); }
-        .teach-btn:hover { border-color: #333; color: #333; background: #fff; }
-
-        /* ローディング・ステータス */
-        #status-bar {
-            margin-top: 20px;
             font-size: 0.8rem;
-            color: #adb5bd;
+            padding: 12px 0;
+            background: white;
+            border: 1px solid #e5e5e5;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        .teach-btn:hover { border-color: var(--accent); }
+
+        /* ステータス & オーバーレイ */
+        .status-bar {
+            position: fixed; bottom: 20px;
+            font-size: 0.75rem; color: #c7c7cc;
             font-family: monospace;
         }
+
+        /* 全画面オーバーレイ（完了通知） */
+        #overlay {
+            position: fixed; inset: 0;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 999;
+        }
+        #overlay.show { opacity: 1; pointer-events: auto; }
+        .overlay-icon { font-size: 3rem; margin-bottom: 10px; transform: scale(0.5); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #overlay.show .overlay-icon { transform: scale(1); }
+        .overlay-text { font-weight: 600; font-size: 1.2rem; }
+
     </style>
 </head>
 <body>
 
-    <h1>Pome AI <span style="font-size:0.6em; vertical-align:middle; background:#eee; padding:2px 6px; border-radius:4px;">Beta</span></h1>
-    <p class="subtitle">みんなで育てる個体識別システム</p>
+    <h1>Pome Classify</h1>
 
-    <div class="main-card">
-        <div class="image-area" id="drop-area">
-            <span id="placeholder-text">画像をタップまたは選択</span>
-            <img id="uploaded-image" alt="target">
-        </div>
-
-        <div class="controls">
-            <label class="btn btn-select">
-                写真を選ぶ
-                <input type="file" id="file-input" accept="image/*">
-            </label>
-            <button id="predict-btn" class="btn btn-predict" disabled>判定実行</button>
-        </div>
-
-        <div id="result-section">
-            <div id="prediction-label" class="result-title">?</div>
-            <div id="prediction-conf" class="result-desc">...</div>
-
-            <div class="teach-area">
-                <span class="teach-label">間違っていますか？正解を教えてAIを賢くする:</span>
-                <div class="teach-grid">
-                    <button class="teach-btn" onclick="teach('もち')">正解は「もち」</button>
-                    <button class="teach-btn" onclick="teach('しらたま')">正解は「しらたま」</button>
-                    <button class="teach-btn" onclick="teach('きなこ')">正解は「きなこ」</button>
-                    <button class="teach-btn" onclick="teach('くろみつ')">正解は「くろみつ」</button>
-                </div>
-            </div>
-        </div>
+    <div class="viewport" id="viewport">
+        <div class="placeholder">Select Image</div>
+        <canvas id="canvas"></canvas>
     </div>
 
-    <div id="status-bar">Connecting to Neural Network...</div>
+    <div class="actions">
+        <label class="file-btn">
+            Photo
+            <input type="file" id="file-input" accept="image/*">
+        </label>
+        <button id="predict-btn" class="primary-btn" disabled>Identify</button>
+    </div>
+
+    <div id="result-area">
+        <div class="prediction" id="pred-label"></div>
+        <div class="confidence" id="pred-conf"></div>
+
+        <div class="teach-grid">
+            <button class="teach-btn" onclick="teach('もち')">もち</button>
+            <button class="teach-btn" onclick="teach('しらたま')">しらたま</button>
+            <button class="teach-btn" onclick="teach('きなこ')">きなこ</button>
+            <button class="teach-btn" onclick="teach('くろみつ')">くろみつ</button>
+        </div>
+        <div style="font-size:0.7rem; color:#ccc; margin-top:10px;">Tap correct name to train</div>
+    </div>
+
+    <div class="status-bar" id="status">Initializing Neural Engine...</div>
+
+    <div id="overlay">
+        <div class="overlay-icon">✓</div>
+        <div class="overlay-text">Learning Complete</div>
+    </div>
 
     <script>
-        // ---------------------------------------------------------
-        // 1. Firebase設定 (あなたのプロジェクト情報)
-        // ---------------------------------------------------------
+        // ==========================================
+        // 1. Configuration & Setup
+        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyDKcFzyED8hWVUdJR0FDmWFOl0UWzOWN3U",
             authDomain: "pome-c99ca.firebaseapp.com",
@@ -188,184 +211,183 @@
             measurementId: "G-9SMH547T55"
         };
 
-        // Firebase初期化 (Compat版)
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        const analytics = firebase.analytics();
 
-        // ---------------------------------------------------------
-        // 2. 変数 & 要素取得
-        // ---------------------------------------------------------
-        let net; // MobileNetモデル
-        let classifier; // KNN分類器
-        let currentActivation; // 現在の画像の特徴量
-
-        const imgEl = document.getElementById('uploaded-image');
-        const statusEl = document.getElementById('status-bar');
+        // Variables
+        let net;
+        let classifier;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const resultArea = document.getElementById('result-area');
         const predictBtn = document.getElementById('predict-btn');
-        const resultSection = document.getElementById('result-section');
-        const placeholder = document.getElementById('placeholder-text');
+        const overlay = document.getElementById('overlay');
+        const viewport = document.getElementById('viewport');
 
-        // ---------------------------------------------------------
-        // 3. 初期化プロセス (AIロード + DB同期)
-        // ---------------------------------------------------------
+        // ==========================================
+        // 2. Core Logic (The "Supreme" ML)
+        // ==========================================
+        
         async function init() {
             try {
-                statusEl.innerText = "Loading MobileNet Model...";
-                net = await mobilenet.load();
-                
-                statusEl.innerText = "Syncing with Shared Brain...";
+                // MobileNet V2 (Alpha 1.0) for maximum accuracy
+                net = await mobilenet.load({ version: 2, alpha: 1.0 });
                 classifier = knnClassifier.create();
-
-                // Firestoreから学習データをロード
-                await loadSharedData();
-
-                statusEl.innerText = "Ready. System Online.";
+                
+                statusEl.innerText = "Syncing with Cloud Brain...";
+                await loadData();
+                
+                statusEl.innerText = "Ready";
             } catch (e) {
-                console.error(e);
                 statusEl.innerText = "Error: " + e.message;
             }
         }
 
-        // データベースから学習済みデータを一括読み込み
-        async function loadSharedData() {
-            // 最新の1000件程度を取得（多すぎると重くなるため制限）
-            const snapshot = await db.collection('dataset')
-                                     .orderBy('timestamp', 'desc')
-                                     .limit(500) 
-                                     .get();
+        async function loadData() {
+            // Load latest 800 examples
+            const snapshot = await db.collection('dataset_v3').orderBy('timestamp', 'desc').limit(800).get();
+            if (snapshot.empty) return;
             
-            if (snapshot.empty) {
-                console.log("学習データなし: 最初の一人目があなたです");
-                return;
-            }
-
-            let count = 0;
             snapshot.forEach(doc => {
-                const data = doc.data();
                 try {
-                    // JSON文字列をTensorに戻す
+                    const data = doc.data();
                     const tensor = tf.tensor(JSON.parse(data.features));
                     classifier.addExample(tensor, data.label);
-                    count++;
-                } catch(err) {
-                    console.error("データ破損スキップ", err);
-                }
+                    tensor.dispose();
+                } catch(e) {}
             });
-            console.log(`${count}件の知識をロードしました`);
         }
 
-        // ---------------------------------------------------------
-        // 4. 画像アップロード処理
-        // ---------------------------------------------------------
+        // ==========================================
+        // 3. Interaction & Prediction
+        // ==========================================
+
         document.getElementById('file-input').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
             reader.onload = (event) => {
-                imgEl.src = event.target.result;
-                imgEl.style.display = 'block';
-                placeholder.style.display = 'none';
-                resultSection.style.display = 'none';
-                
-                imgEl.onload = () => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    // Center Crop & Draw
+                    const size = Math.min(img.width, img.height);
+                    const sx = (img.width - size) / 2;
+                    const sy = (img.height - size) / 2;
+
+                    canvas.width = 224; canvas.height = 224;
+                    ctx.drawImage(img, sx, sy, size, size, 0, 0, 224, 224);
+                    
+                    canvas.classList.add('show');
                     predictBtn.disabled = false;
-                    statusEl.innerText = "Image Loaded.";
+                    resultArea.classList.remove('visible'); // Hide previous result
+                    viewport.classList.add('active');
+                    statusEl.innerText = "Image Loaded";
                 }
             };
             reader.readAsDataURL(file);
         });
 
-        // ---------------------------------------------------------
-        // 5. 判定実行
-        // ---------------------------------------------------------
         predictBtn.addEventListener('click', async () => {
-            if (!net || !classifier) return;
-            
+            if (!net) return;
             statusEl.innerText = "Analyzing...";
             predictBtn.disabled = true;
 
-            // 特徴抽出
-            const activation = net.infer(imgEl, 'conv_preds');
-            currentActivation = activation;
+            const imgTensor = tf.browser.fromPixels(canvas);
+            const activation = net.infer(imgTensor, 'conv_preds');
 
             if (classifier.getNumClasses() > 0) {
-                try {
-                    // 近傍3点のデータを参照
-                    const result = await classifier.predictClass(activation, 3);
-                    showResult(result);
-                } catch (e) {
-                    console.error(e);
-                    statusEl.innerText = "Analysis Failed.";
-                }
+                // K=7 for stability
+                const result = await classifier.predictClass(activation, 7);
+                
+                const label = result.label;
+                const conf = result.confidences[label] ? Math.floor(result.confidences[label] * 100) : 0;
+
+                document.getElementById('pred-label').innerText = label;
+                document.getElementById('pred-conf').innerText = `${conf}% Confidence`;
+                resultArea.classList.add('visible');
             } else {
-                showResult({ label: "データ不足", confidences: {} });
+                document.getElementById('pred-label').innerText = "Unknown";
+                document.getElementById('pred-conf').innerText = "No training data yet";
+                resultArea.classList.add('visible');
             }
-            
+
+            // Cleanup
+            imgTensor.dispose();
+            activation.dispose(); // We re-compute during teaching for augmentation
             predictBtn.disabled = false;
+            statusEl.innerText = "Done";
         });
 
-        function showResult(result) {
-            const label = result.label;
-            const conf = result.confidences[label] ? Math.floor(result.confidences[label] * 100) : 0;
-            
-            const labelEl = document.getElementById('prediction-label');
-            const confEl = document.getElementById('prediction-conf');
-
-            if (label === "データ不足") {
-                labelEl.innerText = "学習データ不足";
-                confEl.innerText = "まだ誰も教えていません。下のボタンで教えてください。";
-            } else {
-                labelEl.innerText = label;
-                confEl.innerText = `確信度: ${conf}%`;
-            }
-            
-            resultSection.style.display = 'block';
-            statusEl.innerText = "Complete.";
-        }
-
-        // ---------------------------------------------------------
-        // 6. 学習 & 共有 (Core Feature)
-        // ---------------------------------------------------------
+        // ==========================================
+        // 4. Learning (Triple Augmentation)
+        // ==========================================
+        
         window.teach = async function(label) {
-            if (!currentActivation) {
-                alert("先に画像を判定してください");
-                return;
-            }
+            statusEl.innerText = "Training...";
+            
+            // Generate Tensors
+            // 1. Original
+            const imgTensor = tf.browser.fromPixels(canvas);
+            
+            // 2. Flipped (左右反転)
+            const flippedTensor = imgTensor.reverse(2);
+            
+            // 3. Brightness Adjusted (少し明るくする) - Robustness against lighting
+            // Values are int32 [0, 255]. Add 20 brightness. Clip to 255.
+            const brightTensor = tf.tidy(() => {
+                return imgTensor.add(tf.scalar(20)).clipByValue(0, 255).cast('int32');
+            });
 
-            statusEl.innerText = "Uploading knowledge to Cloud...";
-
-            // 1. ローカルのモデルにも即反映
-            classifier.addExample(currentActivation, label);
-
-            // 2. データベース保存用にデータを変換 (Tensor -> Array -> JSON)
-            const featureArray = await currentActivation.array();
-            const featureJson = JSON.stringify(featureArray);
+            // Process Batch
+            const tensors = [imgTensor, flippedTensor, brightTensor];
+            const tags = ["original", "flip", "bright"];
+            const batch = db.batch();
 
             try {
-                // Firestoreに追加
-                await db.collection('dataset').add({
-                    label: label,
-                    features: featureJson,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    userAgent: navigator.userAgent // デバッグ用(任意)
-                });
+                for (let i = 0; i < tensors.length; i++) {
+                    const t = tensors[i];
+                    const activation = net.infer(t, 'conv_preds');
+                    
+                    // Local Learn
+                    classifier.addExample(activation, label);
 
-                alert(`「${label}」を学習しました。\nこのデータは全ユーザーに共有されます！`);
+                    // Cloud Save
+                    const features = await activation.array();
+                    const ref = db.collection('dataset_v3').doc();
+                    batch.set(ref, {
+                        label: label,
+                        features: JSON.stringify(features),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        augType: tags[i]
+                    });
+
+                    activation.dispose();
+                }
+
+                await batch.commit();
+
+                // UI Feedback
+                overlay.classList.add('show');
+                setTimeout(() => {
+                    overlay.classList.remove('show');
+                }, 1500);
                 
-                // 再判定して表示更新
-                const result = await classifier.predictClass(currentActivation, 3);
-                showResult(result);
+                statusEl.innerText = "Saved (x3 Augmented)";
 
             } catch (e) {
                 console.error(e);
-                alert("学習データの送信に失敗しました。\n(Firebaseのルール設定を確認してください)");
-                statusEl.innerText = "Upload Failed.";
+                alert("Save Failed");
+            } finally {
+                // Cleanup Tensors
+                imgTensor.dispose();
+                flippedTensor.dispose();
+                brightTensor.dispose();
             }
         };
 
-        // アプリ起動
         init();
     </script>
 </body>
